@@ -1,4 +1,4 @@
-import { categories, documents, landed, milestones, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, specKey, unitOptions } from './trade.js';
+import { categories, documents, landed, milestones, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, SITE_NAME, specKey, unitOptions } from './trade.js';
 
 const icons = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
@@ -44,8 +44,8 @@ const pages = {
 
 export function headerView(role, page) {
   return `<div class="header-inner">
-    <a class="brand" href="#${role === 'buyer' ? 'market' : 'inventory'}">
-      <span class="brand-mark" aria-hidden="true"></span><span translate="no">丝路商贸</span>
+    <a class="brand" href="#${role === 'buyer' ? 'market' : 'inventory'}" aria-label="${SITE_NAME}">
+      <span class="brand-mark" aria-hidden="true"></span><span class="brand-name" translate="no">一带一路<span>国际总商会</span></span>
     </a>
     <nav class="site-nav" aria-label="主要导航">
       ${pages[role].map(([url, label, graphic]) => `<a href="#${url}"${url === page ? ' aria-current="page"' : ''}>${icon(graphic, 19)}<span>${label}</span></a>`).join('')}

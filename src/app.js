@@ -1,4 +1,4 @@
-import { documents, landed, loadState, makeOrder, milestones, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, specKey, STORAGE_KEY } from './trade.js';
+import { documents, landed, loadState, makeOrder, milestones, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, SITE_NAME, specKey, STORAGE_KEY } from './trade.js';
 import { acceptForm, compareDialog, compareSelection, delegateForm, deliveryForm, headerView, icon, inventoryView, marketView, money, ordersView, productDetails, productForm, quoteForm, requestForm, requestsView } from './views.js';
 
 const header = document.querySelector('#header');
@@ -131,7 +131,7 @@ function chooseRequestQuote(id, quoteId) {
 
 function downloadDocument(order, documentType) {
   const lines = [
-    `丝路商贸 · ${documentType.name}（样例）`, '仅用于演示', '', `订单编号 ${order.id}`,
+    `${SITE_NAME} · ${documentType.name}（样例）`, '仅用于演示', '', `订单编号 ${order.id}`,
     `供货方 ${order.quote.supplier}`, `路线 ${order.quote.origin} 至 ${order.destination}`,
     `货品 ${order.product.name}`, `规格 ${order.product.spec}`, `数量 ${order.quantity} ${order.product.unit}`,
   ];

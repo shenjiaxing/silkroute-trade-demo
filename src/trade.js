@@ -1,5 +1,6 @@
 export const OWN_SUPPLIER = 'hai-tu';
 export const OWN_COMPANY = '海途工业品';
+export const SITE_NAME = '一带一路国际总商会';
 export const STORAGE_KEY = 'silkroute-trade-demo-v1';
 
 export const categories = ['紧固件', '包装耗材', '仓储用品'];
