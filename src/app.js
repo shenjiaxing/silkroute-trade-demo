@@ -21,7 +21,11 @@ function route() {
 
 function render() {
   const { page, id } = route();
-  header.innerHTML = headerView(state.role, page);
+  const navigation = `${state.role}/${page}`;
+  if (header.dataset.navigation !== navigation) {
+    header.innerHTML = headerView(state.role, page);
+    header.dataset.navigation = navigation;
+  }
   if (page === 'requests') main.innerHTML = requestsView(state, id);
   else if (page === 'orders') main.innerHTML = ordersView(state, id);
   else if (page === 'inventory') main.innerHTML = inventoryView(state);
@@ -183,6 +187,18 @@ document.addEventListener('click', event => {
     case 'product': showDialog(productDetails(findProduct(id))); break;
     case 'request-new': if (buyer) showDialog(requestForm(findProduct(id))); break;
     case 'compare-toggle': toggleComparison(findProduct(id), button); break;
+    case 'compare-clear':
+      state.compared = [];
+      save();
+      render();
+      main.querySelector('#comparison').focus({ preventScroll: true });
+      break;
+    case 'compare-jump': {
+      const comparison = main.querySelector('#comparison');
+      comparison.scrollIntoView({ block: 'start' });
+      comparison.focus({ preventScroll: true });
+      break;
+    }
     case 'compare-open': openComparison(); break;
     case 'compare-back': openComparison(comparisonQuantity); break;
     case 'catalogue-accept': if (buyer) chooseCatalogueQuote(findProduct(id)); break;

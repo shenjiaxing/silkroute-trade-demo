@@ -23,16 +23,15 @@ const stainlessBolt = {
   category: '紧固件',
   unit: '件',
   moq: 1000,
-  image: 'fasteners',
 };
 
 const products = [
   { ...stainlessBolt, id: 'bolt-suzhou', supplierId: OWN_SUPPLIER, supplier: OWN_COMPANY, origin: '中国苏州', price: 26, freight: 12600, fees: 3300, delivery: 2000, days: 9 },
-  { id: 'box-ningbo', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'hai-yue', supplier: '海越包装', origin: '中国宁波', unit: '个', moq: 500, price: 108, freight: 16500, fees: 2800, delivery: 3500, days: 11, image: 'cartons' },
-  { id: 'pallet-foshan', name: '网格塑料托盘', spec: '1200 × 1000 mm · HDPE', category: '仓储用品', supplierId: 'nan-qiao', supplier: '南桥仓储设备', origin: '中国佛山', unit: '个', moq: 50, price: 1540, freight: 21000, fees: 3800, delivery: 4200, days: 12, image: 'pallets' },
+  { id: 'box-ningbo', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'hai-yue', supplier: '海越包装', origin: '中国宁波', unit: '个', moq: 500, price: 108, freight: 16500, fees: 2800, delivery: 3500, days: 11 },
+  { id: 'pallet-foshan', name: '网格塑料托盘', spec: '1200 × 1000 mm · HDPE', category: '仓储用品', supplierId: 'nan-qiao', supplier: '南桥仓储设备', origin: '中国佛山', unit: '个', moq: 50, price: 1540, freight: 21000, fees: 3800, delivery: 4200, days: 12 },
   { ...stainlessBolt, id: 'bolt-shenzhen', supplierId: 'heng-da', supplier: '恒达紧固件', origin: '中国深圳', price: 29, freight: 7200, fees: 2600, delivery: 1800, days: 7 },
-  { id: 'tape-yiwu', name: '牛皮纸封箱胶带', spec: '48 mm × 50 m · 自粘型', category: '包装耗材', supplierId: 'guo-yu', supplier: '国裕包装', origin: '中国义乌', unit: '卷', moq: 300, price: 175, freight: 8500, fees: 2100, delivery: 1800, days: 8, image: 'tape' },
-  { id: 'box-dongguan', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'dong-an', supplier: '东岸纸品', origin: '中国东莞', unit: '个', moq: 500, price: 103, freight: 18300, fees: 3000, delivery: 3100, days: 10, image: 'cartons' },
+  { id: 'tape-yiwu', name: '牛皮纸封箱胶带', spec: '48 mm × 50 m · 自粘型', category: '包装耗材', supplierId: 'guo-yu', supplier: '国裕包装', origin: '中国义乌', unit: '卷', moq: 300, price: 175, freight: 8500, fees: 2100, delivery: 1800, days: 8 },
+  { id: 'box-dongguan', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'dong-an', supplier: '东岸纸品', origin: '中国东莞', unit: '个', moq: 500, price: 103, freight: 18300, fees: 3000, delivery: 3100, days: 10 },
 ];
 
 export const unitOptions = ['件', '个', '卷', '套', '千克'];
