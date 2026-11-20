@@ -1,5 +1,6 @@
-import { documents, landed, loadState, makeOrder, milestones, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, SITE_NAME, specKey, STORAGE_KEY } from './trade.js';
-import { acceptForm, compareDialog, compareSelection, delegateForm, deliveryForm, headerView, icon, inventoryView, marketView, money, ordersView, productDetails, productForm, quoteForm, requestForm, requestsView } from './views.js';
+import { defaultCase, demoCurrency, findCase } from './cases.js';
+import { caseOf, currencyOf, destinationOf, documents, loadState, makeOrder, matchingOffers, milestones, nextRecordId, OWN_COMPANY, OWN_SUPPLIER, quoteFromProduct, SITE_NAME, specKey, STORAGE_KEY } from './trade.js';
+import { acceptForm, compareDialog, delegateForm, deliveryForm, headerView, icon, inventoryView, marketView, money, ordersView, productDetails, productForm, quoteForm, requestForm, requestsView } from './views.js';
 
 const header = document.querySelector('#header');
 const main = document.querySelector('#main');
@@ -7,7 +8,7 @@ const dialog = document.querySelector('#dialog');
 const toast = document.querySelector('#toast');
 
 let state = loadState();
-const filters = { query: '', category: '', sort: 'featured', similar: '' };
+const filters = { query: '', caseId: defaultCase.id, comparisonCaseId: defaultCase.id, sort: 'featured', similar: '' };
 let comparisonQuantity = 0;
 let orderDraft = null;
 let dialogOpener = null;
@@ -84,19 +85,25 @@ const findOrder = id => state.orders.find(order => order.id === id
   && (state.role === 'buyer' || order.quote.supplierId === OWN_SUPPLIER));
 
 function toggleComparison(product, trigger) {
-  const selected = compareSelection(state);
-  if (state.compared.includes(product.id)) {
-    state.compared = state.compared.filter(id => id !== product.id);
+  const caseId = caseOf(product);
+  const selected = matchingOffers(state, caseId);
+  const ids = selected.map(item => item.id);
+  const switchScope = filters.comparisonCaseId !== caseId;
+  filters.comparisonCaseId = caseId;
+  if (ids.includes(product.id)) {
+    state.comparisons[caseId] = ids.filter(id => id !== product.id);
   } else {
     if (selected.length >= 3) {
+      if (switchScope) render();
       message('最多比较三份报价，请先移除一份。', 'error');
       return;
     }
     if (selected.length && specKey(selected[0]) !== specKey(product)) {
-      message('请先移除其他规格的商品，再添加此商品。', 'error');
+      if (switchScope) render();
+      message('请先移除当前选项，再加入不同规格、线路或币种的商品。', 'error');
       return;
     }
-    state.compared.push(product.id);
+    state.comparisons[caseId] = [...ids, product.id];
   }
   save();
   render();
@@ -105,7 +112,7 @@ function toggleComparison(product, trigger) {
 }
 
 function openComparison(quantity) {
-  const products = compareSelection(state);
+  const products = matchingOffers(state, filters.comparisonCaseId);
   if (!products.length) return;
   comparisonQuantity = quantity ?? Math.max(...products.map(product => product.moq));
   showDialog(compareDialog(products, comparisonQuantity));
@@ -116,7 +123,7 @@ function chooseCatalogueQuote(product) {
     product,
     quote: quoteFromProduct(product, comparisonQuantity),
     quantity: comparisonQuantity,
-    destination: '新加坡裕廊仓库',
+    destination: destinationOf(product),
   };
   showDialog(acceptForm(orderDraft, 'compare'));
 }
@@ -136,7 +143,8 @@ function downloadDocument(order, documentType) {
     `货品 ${order.product.name}`, `规格 ${order.product.spec}`, `数量 ${order.quantity} ${order.product.unit}`,
   ];
   if (documentType.key === 'invoice') {
-    lines.push(`商品单价 ${money(order.quote.price)}`, `商品货款 ${money(order.quote.price * order.quantity)}`);
+    const currency = currencyOf(order.quote);
+    lines.push(`结算币种 ${currency}`, `商品单价 ${money(order.quote.price, currency)}`, `商品货款 ${money(order.quote.price * order.quantity, currency)}`);
   } else {
     lines.push('包装 外箱装载，箱数与重量以实际装运清单为准。');
   }
@@ -162,33 +170,35 @@ function advance(order) {
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
-  const { action, id, category, quote, doc } = button.dataset;
+  const { action, id, quote, doc } = button.dataset;
   const buyer = state.role === 'buyer';
 
   switch (action) {
     case 'dialog-close': dialog.close(); break;
-    case 'category':
-      filters.category = category;
-      filters.similar = '';
+    case 'case-select':
+      Object.assign(filters, { caseId: id, query: '', similar: '' });
+      if (id) filters.comparisonCaseId = id;
       render();
-      main.querySelector('.filter-chip[aria-pressed="true"]')?.focus({ preventScroll: true });
+      main.querySelector('.case-tab[aria-pressed="true"]')?.focus({ preventScroll: true });
       break;
     case 'search-reset':
-      Object.assign(filters, { query: '', category: '', similar: '' });
+      Object.assign(filters, { query: '', similar: '' });
       render();
       main.querySelector('[name="query"]')?.focus({ preventScroll: true });
       break;
-    case 'similar':
+    case 'similar': {
+      const caseId = caseOf(findProduct(id));
       if (dialog.open) dialog.close();
-      Object.assign(filters, { query: '', category: '', similar: id });
+      Object.assign(filters, { query: '', caseId, comparisonCaseId: caseId, similar: id });
       render();
       main.querySelector('.filter-context button')?.focus({ preventScroll: true });
       break;
+    }
     case 'product': showDialog(productDetails(findProduct(id))); break;
-    case 'request-new': if (buyer) showDialog(requestForm(findProduct(id))); break;
+    case 'request-new': if (buyer) showDialog(requestForm(findProduct(id), filters.caseId)); break;
     case 'compare-toggle': toggleComparison(findProduct(id), button); break;
     case 'compare-clear':
-      state.compared = [];
+      state.comparisons[filters.comparisonCaseId] = [];
       save();
       render();
       main.querySelector('#comparison').focus({ preventScroll: true });
@@ -260,6 +270,16 @@ document.addEventListener('change', event => {
     render();
     main.querySelector('#sort-select').focus({ preventScroll: true });
   }
+  if (event.target.name === 'caseId') {
+    const scene = findCase(event.target.value);
+    if (!scene) return;
+    const form = event.target.form;
+    const isRequest = form.dataset.form === 'request';
+    const locationField = form.elements.namedItem(isRequest ? 'destination' : 'origin');
+    const suggestion = isRequest ? scene.destination : scene.origin;
+    if (locationField.value === form.dataset.autoLocation) locationField.value = suggestion;
+    form.dataset.autoLocation = suggestion;
+  }
 });
 
 document.addEventListener('input', event => {
@@ -295,8 +315,10 @@ document.addEventListener('submit', event => {
     case 'compare-quantity': openComparison(number('quantity')); break;
     case 'request': {
       if (!buyer) return;
-      const id = `RFQ-${String(state.requests.length + 1).padStart(4, '0')}`;
-      state.requests.push({ id, name: value('name'), spec: value('spec'), category: value('category'),
+      const scene = findCase(value('caseId'));
+      const id = nextRecordId('RFQ', state.requests);
+      state.requests.push({ id, name: value('name'), spec: value('spec'), caseId: scene?.id ?? null,
+        category: scene?.label ?? form.dataset.category, currency: scene ? demoCurrency : 'SGD',
         quantity: number('quantity'), unit: value('unit'), destination: value('destination'), note: value('note'), orderId: null, quotes: [] });
       save();
       go('requests', id);
@@ -307,14 +329,20 @@ document.addEventListener('submit', event => {
       if (buyer) return;
       const product = findProduct(form.dataset.id);
       if (product && product.supplierId !== OWN_SUPPLIER) return;
+      const scene = findCase(value('caseId'));
+      if (!scene && !product) return;
       const values = {
-        name: value('name'), spec: value('spec'), category: value('category'), unit: value('unit'), origin: value('origin'),
+        name: value('name'), spec: value('spec'), caseId: scene?.id ?? null,
+        category: scene?.label ?? product.category, currency: product ? currencyOf(product) : demoCurrency,
+        destination: scene?.destination ?? destinationOf(product), unit: value('unit'), origin: value('origin'),
         price: cents('price'), moq: number('moq'), freight: cents('freight'), fees: cents('fees'), delivery: cents('delivery'), days: number('days'),
       };
+      if (data.has('tax')) values.tax = cents('tax');
       if (product) {
+        const previousCaseId = caseOf(product);
         Object.assign(product, values);
-        const selection = compareSelection(state);
-        state.compared = selection.filter(item => specKey(item) === specKey(selection[0])).map(item => item.id);
+        const selection = matchingOffers(state, previousCaseId).filter(item => caseOf(item) === previousCaseId);
+        state.comparisons[previousCaseId] = selection.filter(item => specKey(item) === specKey(selection[0])).map(item => item.id);
       } else {
         state.products.unshift({ ...values, id: `product-${crypto.randomUUID()}`, supplierId: OWN_SUPPLIER, supplier: OWN_COMPANY });
       }
@@ -327,7 +355,7 @@ document.addEventListener('submit', event => {
       const request = findRequest(form.dataset.id);
       if (buyer || !request || request.orderId) return;
       const existing = request.quotes.find(item => item.supplierId === OWN_SUPPLIER);
-      const values = { origin: value('origin'), days: number('days'), price: cents('price'), freight: cents('freight'),
+      const values = { origin: value('origin'), days: number('days'), currency: currencyOf(request), price: cents('price'), freight: cents('freight'),
         fees: cents('fees'), tax: cents('tax'), delivery: cents('delivery'), note: value('note') };
       if (existing) Object.assign(existing, values);
       else request.quotes.push({ ...values, id: crypto.randomUUID(), supplierId: OWN_SUPPLIER, supplier: OWN_COMPANY });
@@ -340,7 +368,7 @@ document.addEventListener('submit', event => {
       if (!buyer || !orderDraft) return;
       const request = findRequest(orderDraft.requestId);
       if (request?.orderId) return;
-      const order = makeOrder({ ...orderDraft, number: state.orders.length + 1 });
+      const order = makeOrder({ ...orderDraft, id: nextRecordId('SL', state.orders) });
       state.orders.push(order);
       if (request) request.orderId = order.id;
       save();

@@ -1,9 +1,11 @@
-export const OWN_SUPPLIER = 'hai-tu';
-export const OWN_COMPANY = '海途工业品';
-export const SITE_NAME = '一带一路国际总商会';
-export const STORAGE_KEY = 'silkroute-trade-demo-v1';
+import { demoCurrency, findCase, otherCaseId, sampleOrderId, tradeCases } from './cases.js';
 
-export const categories = ['紧固件', '包装耗材', '仓储用品'];
+export const OWN_SUPPLIER = 'hai-tu';
+export const OWN_COMPANY = '演示供货企业';
+export const SITE_NAME = '一带一路国际总商会';
+export const STORAGE_KEY = 'silkroute-trade-demo-v2';
+const previousStorageKey = 'silkroute-trade-demo-v1';
+const previousDestination = '新加坡裕廊仓库';
 
 export const documents = [
   { key: 'invoice', name: '商业发票', filename: 'invoice' },
@@ -18,35 +20,31 @@ export const milestones = [
   { name: '买家已签收', message: '订单送达并记录最终费用' },
 ];
 
-const stainlessBolt = {
-  name: '304 不锈钢六角螺栓',
-  spec: 'M8 × 30 mm · DIN 933',
-  category: '紧固件',
-  unit: '件',
-  moq: 1000,
-};
+export const unitOptions = ['件', '个', '卷', '套', '千克', '块', '台', '米', '只'];
 
-const products = [
-  { ...stainlessBolt, id: 'bolt-suzhou', supplierId: OWN_SUPPLIER, supplier: OWN_COMPANY, origin: '中国苏州', price: 26, freight: 12600, fees: 3300, delivery: 2000, days: 9 },
-  { id: 'box-ningbo', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'hai-yue', supplier: '海越包装', origin: '中国宁波', unit: '个', moq: 500, price: 108, freight: 16500, fees: 2800, delivery: 3500, days: 11 },
-  { id: 'pallet-foshan', name: '网格塑料托盘', spec: '1200 × 1000 mm · HDPE', category: '仓储用品', supplierId: 'nan-qiao', supplier: '南桥仓储设备', origin: '中国佛山', unit: '个', moq: 50, price: 1540, freight: 21000, fees: 3800, delivery: 4200, days: 12 },
-  { ...stainlessBolt, id: 'bolt-shenzhen', supplierId: 'heng-da', supplier: '恒达紧固件', origin: '中国深圳', price: 29, freight: 7200, fees: 2600, delivery: 1800, days: 7 },
-  { id: 'tape-yiwu', name: '牛皮纸封箱胶带', spec: '48 mm × 50 m · 自粘型', category: '包装耗材', supplierId: 'guo-yu', supplier: '国裕包装', origin: '中国义乌', unit: '卷', moq: 300, price: 175, freight: 8500, fees: 2100, delivery: 1800, days: 8 },
-  { id: 'box-dongguan', name: '五层瓦楞运输纸箱', spec: '400 × 300 × 250 mm · BC 楞', category: '包装耗材', supplierId: 'dong-an', supplier: '东岸纸品', origin: '中国东莞', unit: '个', moq: 500, price: 103, freight: 18300, fees: 3000, delivery: 3100, days: 10 },
-];
+export const caseOf = item => findCase(item?.caseId)?.id ?? otherCaseId;
+export const currencyOf = item => item?.currency === demoCurrency ? demoCurrency : 'SGD';
+export const destinationOf = item => item.destination || findCase(item.caseId)?.destination || previousDestination;
 
-export const unitOptions = ['件', '个', '卷', '套', '千克'];
+export function matchingOffers(state, caseId) {
+  return (state.comparisons[caseId] ?? []).map(id => state.products.find(product => product.id === id)).filter(Boolean);
+}
 
 export function quoteFromProduct(product, quantity) {
   const batches = quantity / product.moq;
   const freight = Math.round(product.freight * batches);
+  // The old Singapore demo stored no per-lot tax amount.
+  const tax = product.tax === undefined
+    ? Math.round((product.price * quantity + freight) * 0.09)
+    : Math.round(product.tax * batches);
   return {
     supplierId: product.supplierId,
     supplier: product.supplier,
     origin: product.origin,
+    currency: currencyOf(product),
     price: product.price,
     freight,
-    tax: Math.round((product.price * quantity + freight) * 0.09),
+    tax,
     fees: product.fees,
     delivery: Math.round(product.delivery * batches),
     days: product.days,
@@ -58,14 +56,20 @@ export function landed(quote, quantity) {
 }
 
 export function specKey(product) {
-  return [product.category, product.name, product.spec, product.unit]
+  return [caseOf(product), product.category, product.name, product.spec, product.unit, destinationOf(product), currencyOf(product)]
     .map(value => value.normalize('NFKC').toLowerCase().replace(/\s+/g, ''))
     .join('|');
 }
 
-export function makeOrder({ number, product, quote, quantity, destination, requestId = null }) {
+export function nextRecordId(prefix, records) {
+  const latest = records.reduce((number, record) => Math.max(number, Number(record.id.slice(prefix.length + 1)) || 0), 0);
+  return `${prefix}-${String(latest + 1).padStart(4, '0')}`;
+}
+
+export function makeOrder({ id, product, quote, quantity, destination, requestId = null }) {
   return {
-    id: `SL-${String(number).padStart(4, '0')}`,
+    id,
+    caseId: product.caseId ?? null,
     product: { name: product.name, spec: product.spec, unit: product.unit },
     quote: { ...quote },
     quantity,
@@ -79,43 +83,69 @@ export function makeOrder({ number, product, quote, quantity, destination, reque
 }
 
 function freshState() {
-  const request = {
-    id: 'RFQ-0001',
-    name: '五层瓦楞运输纸箱',
-    spec: '400 × 300 × 250 mm · BC 楞',
-    category: '包装耗材',
-    quantity: 500,
-    unit: '个',
-    destination: '新加坡裕廊仓库',
-    note: '希望纸箱平铺打包，报价请注明预计到仓时间。',
-    orderId: null,
-    quotes: [{ ...quoteFromProduct(products[1], 500), id: 'quote-seed', note: '含新加坡本地送仓。' }],
-  };
-  const sampleOrder = makeOrder({
-    number: 1,
-    product: products[0],
-    quote: quoteFromProduct(products[0], 1000),
-    quantity: 1000,
-    destination: '新加坡裕廊仓库',
-  });
-  sampleOrder.docs.invoice = true;
+  const state = { role: 'buyer', products: [], requests: [], orders: [], comparisons: {} };
+  for (const scene of tradeCases) {
+    const offers = scene.offers.map(offer => ({
+      ...offer,
+      caseId: scene.id,
+      category: scene.label,
+      destination: scene.destination,
+      currency: demoCurrency,
+      supplierId: offer.supplier ? `sample-${offer.id}` : OWN_SUPPLIER,
+      supplier: offer.supplier ?? OWN_COMPANY,
+    }));
+    state.products.push(...offers);
+    state.comparisons[scene.id] = offers.slice(0, 2).map(offer => offer.id);
 
-  return {
-    role: 'buyer',
-    products: structuredClone(products),
-    requests: [request],
-    orders: [sampleOrder],
-    compared: ['bolt-suzhou', 'bolt-shenzhen'],
-  };
+    const sampleOffer = offers[0];
+    const sampleOrder = makeOrder({
+      id: sampleOrderId(scene), product: sampleOffer, quote: quoteFromProduct(sampleOffer, sampleOffer.moq),
+      quantity: sampleOffer.moq, destination: scene.destination,
+    });
+    sampleOrder.docs.invoice = true;
+    state.orders.push(sampleOrder);
+
+    const requestOffer = offers.at(-1);
+    state.requests.push({
+      id: `RFQ-C${String(scene.page).padStart(2, '0')}`, caseId: scene.id, category: scene.label, currency: demoCurrency,
+      name: requestOffer.name, spec: requestOffer.spec, unit: requestOffer.unit,
+      quantity: requestOffer.moq, destination: scene.destination, orderId: null,
+      note: '请注明送仓费用和预计到仓时间。',
+      quotes: [{ ...quoteFromProduct(requestOffer, requestOffer.moq), id: `quote-case-${scene.page}`, note: '费用为演示估算。' }],
+    });
+  }
+  return state;
+}
+
+const previousSeedIds = new Set(['bolt-suzhou', 'box-ningbo', 'pallet-foshan', 'bolt-shenzhen', 'tape-yiwu', 'box-dongguan']);
+const editablePreviousSeed = {
+  name: '304 不锈钢六角螺栓', spec: 'M8 × 30 mm · DIN 933', category: '紧固件', origin: '中国苏州', unit: '件',
+  moq: 1000, price: 26, freight: 12600, fees: 3300, delivery: 2000, days: 9,
+};
+
+function loadPrevious(previous) {
+  const state = freshState();
+  state.role = previous.role === 'seller' ? 'seller' : 'buyer';
+  const savedProducts = previous.products.filter(product => !previousSeedIds.has(product.id)
+    || (product.id === 'bolt-suzhou' && Object.entries(editablePreviousSeed).some(([field, value]) => product[field] !== value)));
+  state.products.push(...savedProducts.map(product => ({ ...product, currency: 'SGD', destination: previousDestination })));
+  state.comparisons[otherCaseId] = (previous.compared ?? []).filter(id => savedProducts.some(product => product.id === id));
+  state.requests.unshift(...previous.requests.filter(request => request.id !== 'RFQ-0001'
+    || request.orderId || request.quotes.some(quote => quote.id !== 'quote-seed')));
+  state.orders.unshift(...previous.orders.filter(order => order.id !== 'SL-0001' || order.stage > 0 || order.docs.packing));
+  return state;
+}
+
+function hasRecords(state) {
+  return Array.isArray(state?.products) && Array.isArray(state?.requests) && Array.isArray(state?.orders);
 }
 
 export function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(saved?.products) && Array.isArray(saved?.requests)
-      && Array.isArray(saved?.orders) && Array.isArray(saved?.compared)) {
-      return saved;
-    }
+    if (hasRecords(saved) && saved.comparisons) return saved;
+    const previous = JSON.parse(localStorage.getItem(previousStorageKey));
+    if (hasRecords(previous)) return loadPrevious(previous);
   } catch {
     // The demo also works in browsers that disallow storage.
   }
